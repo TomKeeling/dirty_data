@@ -1,15 +1,30 @@
+---
+title: "DECATHLON DATA"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    theme : cosmo
+  pdf_document: default
+---
+
+The Decathlon dataset contains scores from a set of athletes recorded during the Olympic Games and Decastar competitions.
+
+___
+
+Using the data cleaning script found in the data_cleaning_scripts folder, I clean the original dataset and assign it to the name "clean_decathlon_data"
 ```{r}
 library(here)
 library(tidyverse)
 source(here("data_cleaning_scripts/decathlon_cleaning_script.R"))
 
 clean_decathlon_data <- clean_decathlon(read_rds(here("raw_data/decathlon.rds")))
-clean_decathlon_data
-rm(clean_decathlon)
-view(clean_decathlon_data)
 write_csv(clean_decathlon_data, here("clean_data/clean_decathlon_data"))
 ```
-Now exploring the data
+
+___
 
 Who had the longest long jump seen in the data?
 ```{r}
@@ -19,25 +34,29 @@ clean_decathlon_data %>%
 ```
 Clay had the longest long Jump seen in the data
 
+___
+
 What was the average 100m time in each competition?
 ```{r}
 clean_decathlon_data %>% 
   group_by(competition) %>% 
   summarise(mean(x100m))
-clean_decathlon_data %>% 
-  summarise_all(funs(sum(is.na(.))))
 
 ```
 I actually forgot how insanely fast people do 100m... OlympicG had much faster times - over 0.3 seconds faster.
+
+___
 
 Who had the highest total points across both competitions?
 ```{r}
 clean_decathlon_data %>% 
   group_by(name) %>% 
   summarise(total_pt = sum(points)) %>% 
-  arrange(desc = total_pt)
+  slice_max(total_pt)
 ```
-Bourguignon had the highest total points from both competitions combined.
+Sebrle had the highest total points from both competitions combined.
+
+___
 
 What was the shot-put scores for the top three competitors in each competition?
 ```{r}
@@ -48,7 +67,7 @@ clean_decathlon_data %>%
   
 
 ```
-
+___
 
 What was the average points for competitors who ran the 400m in less than 50 seconds vs. those than ran 400m in more than 50 seconds?
 

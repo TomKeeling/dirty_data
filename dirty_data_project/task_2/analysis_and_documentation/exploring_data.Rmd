@@ -1,0 +1,333 @@
+---
+title: "HALLOWEEN CANDY - JOY OR DESPAIR?"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+    theme : cosmo
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(here)
+library(tidyverse)
+```
+
+# IMPORT & CLEAN DATA
+This data is pretty messy, so I'm reading it in having already used my own script to clean it. You can find this in the _"data_cleaning_scripts"_ folder. The document is a survey of worldwide participants asked if a particular candy gives them the feeling of "joy", "despair" or "meh"... It also includes variables such as the country and age of participants.
+
+<details>
+<summary>You can also view the cleaning code here</summary>
+```{r eval=FALSE}
+library(here)
+library(dplyr)
+
+#Read in the data - this is an xlsx format so we need the "readxl" library. Also shoot it through Janitor to make the column names managable.
+
+
+boing_candy_2015 <- readxl::read_xlsx(here("raw_data/boing-boing-candy-2015.xlsx"))
+boing_candy_2016 <- readxl::read_xlsx(here("raw_data/boing-boing-candy-2016.xlsx"))
+boing_candy_2017 <- readxl::read_xlsx(here("raw_data/boing-boing-candy-2017.xlsx"))
+
+boing_candy_2015 <- janitor::clean_names(boing_candy_2015)
+boing_candy_2016 <- janitor::clean_names(boing_candy_2016)
+names(boing_candy_2017) <- names(boing_candy_2017) %>% 
+  str_remove_all("^Q[0-9]+[? :|]*")
+boing_candy_2017 <- janitor::clean_names(boing_candy_2017)
+
+#Clean the column names ready for the rows to be bound together...
+
+boing_candy_2016 <- boing_candy_2016 %>% 
+  rename(sweetums = sweetums_a_friend_to_diabetes)
+
+boing_candy_2017 <- boing_candy_2017 %>% 
+  rename(sweetums = sweetums_a_friend_to_diabetes,
+         are_you_going_actually_going_trick_or_treating_yourself = going_out,
+         state = state_province_county_etc,
+         anonymous_brown_globs_that_come_in_black_and_orange_wrappers = anonymous_brown_globs_that_come_in_black_and_orange_wrappers_a_k_a_mary_janes,)
+
+#Adding year columns for some analysis later...
+
+boing_candy_2015 <- boing_candy_2015 %>% 
+  mutate(year = "2015", .before = 1)
+
+boing_candy_2016 <- boing_candy_2016 %>% 
+  mutate(year = "2016", .before = 1)
+
+boing_candy_2017 <- boing_candy_2017 %>% 
+  mutate(year = "2017", .before = 1)
+
+
+#Combine rows in two steps. This was done initially just because 2016 and 2015's datasets are more similar than 2017.
+
+
+candy_combined_pre <- bind_rows(boing_candy_2016, boing_candy_2015) %>% 
+  rename(
+    age = how_old_are_you,
+    gender = your_gender,
+    country = which_country_do_you_live_in,
+    state = which_state_province_county_do_you_live_in
+  )
+
+
+candy_combined <- bind_rows(candy_combined_pre, boing_candy_2017)
+
+#Just renaming a clumsy column name here.
+
+candy_combined <- candy_combined %>% rename(
+  attending_t_or_t = are_you_going_actually_going_trick_or_treating_yourself
+)
+
+
+
+#remove columns which don't relate to our analysis goals.
+
+to_remove <- c(13, 22, 23, 27, 28, 32, 44, 80, 102, 103, 105, 106, 108:124, 13, 140:155, 158, 159, 162:172)
+
+candy_combined <- candy_combined %>% 
+  select(!to_remove) 
+
+# make ages numeric and impute NA values so that we can do calculations on the column.
+
+candy_combined <- candy_combined %>% 
+  mutate(
+    age = str_replace_all(age, "[a-zA-Z]", NA_character_),
+    age = as.numeric(age),
+    age = case_when(
+      is.na(age) ~ NA_real_,
+      age > 100 ~ NA_real_,
+      TRUE ~ age
+    ),
+    age = coalesce(age, mean(age, na.rm = TRUE))
+  )
+
+#The country column is really messy - I'm bringing in some external datasets here to help sort the entries.
+
+country_compare <- read_csv(url("https://pkgstore.datahub.io/core/country-list/data_csv/data/d7c9d7cfb42cb69f4422dec222dbbaa8/data_csv.csv")) %>% 
+  select(Name) %>% 
+  mutate(Name = str_to_upper(Name))
+here()
+states_compare <- datasets::state.name
+states_compare <- str_to_upper(states_compare)
+
+#The regex here catches spelling mistakes, but also mistakes such as putting the state in instead of country (for Americans).
+#It also checks the input country is within a list of real countries. Neverland, for example, would be converted to NA.
+
+candy_combined_country_sorted <- candy_combined %>% 
+  mutate(
+    country = str_to_upper(country),
+    country = case_when(
+      str_detect(country, "THE NETHERLANDS") ~ "THE NETHERLANDS",
+      str_detect(country, "TAIWAN") ~ "TAIWAN",
+      str_detect(country, "CANADA'") ~ "CANADA",
+      str_detect(country, "UAE") ~ "UNITED ARAB EMIRATES",
+      str_detect(country, "ESPAÑA") ~ "SPAIN",
+      str_detect(country, "AUSTRALIA") ~ "AUSTRALIA",
+      str_detect(country,"(?i)HUNGARY") ~ "HUNGARY",
+      str_detect(country,"(?i)AUSTRIA") ~ "AUSTRIA",
+      str_detect(country,"(?i)BRASIL") ~ "BRASIL",
+      str_detect(country,"(?i)(the )?(un[iteds]?)(?! kingdom)") ~ "USA",
+      str_detect(country,"ENGLAND|SCOTLAND|WALES|UK|U K|NORTHERN IRELAND|U.K.") ~ "UNITED KINGDOM",
+      str_detect(country,"(?i)u.?s.?a?") ~ "USA",
+      str_detect(country,"(?i)[a']?m[eu]rica") ~ "USA",
+      str_detect(country,"amer") ~ "USA",
+      str_detect(country,"KOREA") ~ "SOUTH KOREA",
+      str_detect(country,"[0-9]") ~ NA_character_,
+      str_count(country, ".") > 28 ~ NA_character_,
+      country %in% country_compare$Name ~ country,
+      country %in% states_compare ~ "USA",
+      TRUE ~ NA_character_
+    )
+    
+    
+  )
+
+#The CSV here is now written into the clean data folder
+
+write_csv(candy_combined_country_sorted, here("clean_data/candy_combined_sorted.csv"))
+
+
+```
+</details>
+
+___
+
+```{r}
+candy_combined <- read_csv(here("clean_data/candy_combined_sorted.csv"))
+```
+
+___
+
+
+# NUMBER OF RECORDINGS
+Just to check out the data we're dealing with - let's have a look at how many individual candy reviews are recorded. We can do this by summarising each candy column and adding up the row of sums.
+
+```{r}
+candy_combined %>% 
+  select(x100_grand_bar:length(candy_combined)) %>%
+  summarise_all(funs(sum(!is.na(.)))) %>% 
+  rowSums()
+
+```
+
+___
+
+
+# AGE OF HALLOWEEN-ERS
+
+___
+
+## TRICK-OR-TREAT LOVERS
+For those who answered and are trick or treat-ers, what's the average age? Many participants had answered "Old Enough" and other witty remarks. These answers have been imputed to the average age of the group. You can see how this is done in the cleaning script.
+```{r}
+candy_combined %>% 
+  filter(attending_t_or_t == "Yes") %>% 
+  select(age) %>% 
+  summarise(mean_age = mean(age))
+
+
+```
+This is pretty jokes,  the average age of those attending T or T is ~35. I expected this to be much lower - 15 or 16. It also seems that the majority of participants are from the USA, so perhaps they have a different culture to ours in the UK regarding the activity.
+
+___
+
+## TRICK-OR-TREAT HATERS
+What was the average age of people who are __not__ going trick or treating?
+```{r}
+
+candy_combined %>% 
+  filter(attending_t_or_t != "Yes") %>% 
+  select(age) %>% 
+  summarise(mean_age = mean(age))
+```
+
+
+
+The people who did not go on T or T had an average age of ~39... Here I wondered if there will be a lot of kids taking part in the activity too, so, if we would like to know what the average age of adults participating is, then we can work that out by filtering age .
+
+```{r}
+
+candy_combined %>% 
+  filter(attending_t_or_t != "Yes",
+         age >= 18) %>% 
+  select(age) %>% 
+  summarise(mean_age = mean(age))
+```
+A ~0.2 difference in average suggests that there really aren't that many children taking part in the survey who attend trick or treat.
+
+___
+
+# MOST LIKED & MOST HATED CANDY BARS
+For each review answer of "joy", "despair" and "meh", which candy bar received the most of these ratings?
+```{r}
+
+
+candy_combined %>% 
+  select(x100_grand_bar:peanut_butter_bars) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars, names_to = "candy_name", values_to = "review") %>% 
+  group_by(review) %>% 
+  count(candy_name, review) %>% 
+  filter(n == max(n))
+
+
+```
+broken_glow_stick prompts the most "despair", ful_ sized_candy_bar,  the most "joy", and lollipops were the most "meh". People most answered NA for third_party_m_ms, which seems to suggest that they're not a particularly common treat.
+
+___
+
+## ARE STARBURSTS REALLY THAT GREAT?
+
+How many people rated Starburst as despair?
+```{r}
+candy_combined %>% 
+  select(starburst) %>% 
+  pivot_longer(cols = starburst, names_to = "candy_name", values_to = "review") %>% 
+  group_by(review) %>% 
+  count(candy_name, review)
+
+```
+Starburst had 1900 recorded reviews which were DESPAIR. Out of all 9349 reviews regarding Starbursts, this is 21.2% of answers - much higher than I would've thought. This is probably because the resolution of the answers reduces the range for nuances like "dislike" and "somewhat like" considerably.
+
+___
+
+# MEASURING JOY AND DESPAIR
+
+___
+
+## SCORING SYSTEM
+Using a scoring system to count "despair" as -1, "joy" as +1, and "meh" as 0 so that we can get numerical and comparable results.
+```{r}
+
+candy_scores <- candy_combined %>% 
+  mutate(across(x100_grand_bar:peanut_butter_bars,
+    ~ case_when(
+      . == "JOY" ~ 1,
+      . =="MEH" ~ 0,
+      . =="DESPAIR" ~ -1,
+      TRUE ~ NA_real_
+    ))
+  ) 
+```
+
+__
+
+## HIGH SCORERS BY GENDER
+What was the most popular candy bar by this rating system for each gender in the dataset ?
+```{r}
+candy_scores %>% 
+  select(gender, x100_grand_bar:peanut_butter_bars, -any_full_sized_candy_bar) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars , names_to = "candy_name", values_to = "review") %>% 
+  group_by(gender, candy_name) %>% 
+  drop_na(review) %>% 
+  summarise(total_score = sum(review)) %>% 
+  filter(total_score == max(total_score))
+
+```
+I have omitted full_sized candy bar because it it a bit of an umbrella category and dominates the results. Men and women clearly like Reeses PB cups. Those who would rather not say enjoyed a Kit Kat, and those identifying as over liked Twix more.
+
+___
+
+## HIGH SCORERS BY YEAR
+What was the most popular candy bar by year?
+```{r}
+candy_scores %>% 
+  select(year, x100_grand_bar:peanut_butter_bars, -any_full_sized_candy_bar) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars , names_to = "candy_name", values_to = "review") %>% 
+  group_by(year, candy_name) %>% 
+  drop_na(review) %>% 
+  summarise(total_score = sum(review)) %>% 
+  filter(total_score == max(total_score))
+```
+
+___
+
+## HIGH SCORERS BY COUNTRY
+What was the most popular candy bar by this rating for people in US, Canada, UK, and all other countries?
+```{r}
+candy_scores %>% 
+  select(country, x100_grand_bar:peanut_butter_bars, -any_full_sized_candy_bar) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars , names_to = "candy_name", values_to = "review") %>% 
+  group_by(country, candy_name) %>% 
+  drop_na(review) %>% 
+  summarise(total_score = sum(review)) %>% 
+  filter(total_score == max(total_score))
+```
+Here, the data gets a little difficult to read because many countries only had one or two participants in the survey. This made for a lot of draws where the max score wasn't very big. Filtering these out might make for more valuable results.
+```{r}
+candy_scores %>% 
+  select(country, x100_grand_bar:peanut_butter_bars, -any_full_sized_candy_bar) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars , names_to = "candy_name", values_to = "review") %>% 
+  group_by(country, candy_name) %>% 
+  drop_na(review) %>% 
+  summarise(total_score = sum(review)) %>% 
+  filter(total_score == max(total_score),
+         total_score >= 3)
+```
+
+

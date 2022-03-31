@@ -1,0 +1,46 @@
+exploring the countries colimn with regex
+
+```{r}
+country_compare <- read_csv(url("https://pkgstore.datahub.io/core/country-list/data_csv/data/d7c9d7cfb42cb69f4422dec222dbbaa8/data_csv.csv")) %>% 
+select(Name) %>% 
+  mutate(Name = str_to_upper(Name))
+here()
+states_compare <- datasets::state.name
+states_compare <- str_to_upper(states_compare)
+
+
+candy_combined <- candy_combined %>% 
+  mutate(
+    country = str_to_upper(country),
+    country = case_when(
+      str_detect(country, "THE NETHERLANDS") ~ "THE NETHERLANDS",
+      str_detect(country, "TAIWAN") ~ "TAIWAN",
+      str_detect(country, "CANADA'") ~ "CANADA",
+      str_detect(country, "UAE") ~ "UNITED ARAB EMIRATES",
+      str_detect(country, "ESPAÑA") ~ "SPAIN",
+      str_detect(country, "AUSTRALIA") ~ "AUSTRALIA",
+      str_detect(country,"(?i)HUNGARY") ~ "HUNGARY",
+      str_detect(country,"(?i)AUSTRIA") ~ "AUSTRIA",
+      str_detect(country,"(?i)BRASIL") ~ "BRASIL",
+      str_detect(country,"(?i)(the )?(un[iteds]?)(?! kingdom)") ~ "USA",
+      str_detect(country,"ENGLAND|SCOTLAND|WALES|UK|U K|NORTHERN IRELAND|U.K.") ~ "UNITED KINGDOM",
+      str_detect(country,"(?i)u.?s.?a?") ~ "USA",
+      str_detect(country,"(?i)[a']?m[eu]rica") ~ "USA",
+      str_detect(country,"amer") ~ "USA",
+      str_detect(country,"KOREA") ~ "SOUTH KOREA",
+      str_detect(country,"[0-9]") ~ NA_character_,
+      str_count(country, ".") > 28 ~ NA_character_,
+      country %in% country_compare$Name ~ country,
+      country %in% states_compare ~ "USA",
+      TRUE ~ NA_character_
+    )
+    
+    
+  )
+
+  
+```
+```{r}
+country_list
+```
+

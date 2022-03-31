@@ -1,0 +1,70 @@
+```{r}
+library(here)
+library(tidyverse)
+source(here("data_cleaning_scripts/decathlon_cleaning_script.R"))
+
+clean_decathlon_data <- clean_decathlon(read_rds(here("raw_data/decathlon.rds")))
+clean_decathlon_data
+rm(clean_decathlon)
+view(clean_decathlon_data)
+write_csv(clean_decathlon_data, here("clean_data/clean_decathlon_data"))
+```
+Now exploring the data
+
+Who had the longest long jump seen in the data?
+```{r}
+clean_decathlon_data %>% 
+  select(name, long_jump) %>% 
+  slice_max(long_jump, n = 1)
+```
+Clay had the longest long Jump seen in the data
+
+What was the average 100m time in each competition?
+```{r}
+clean_decathlon_data %>% 
+  group_by(competition) %>% 
+  summarise(mean(x100m))
+clean_decathlon_data %>% 
+  summarise_all(funs(sum(is.na(.))))
+
+```
+I actually forgot how insanely fast people do 100m... OlympicG had much faster times - over 0.3 seconds faster.
+
+Who had the highest total points across both competitions?
+```{r}
+clean_decathlon_data %>% 
+  group_by(name) %>% 
+  summarise(total_pt = sum(points)) %>% 
+  arrange(desc = total_pt)
+```
+Bourguignon had the highest total points from both competitions combined.
+
+What was the shot-put scores for the top three competitors in each competition?
+```{r}
+clean_decathlon_data %>% 
+  group_by(competition) %>% 
+  slice_max(shot_put, n = 3) %>% 
+  select(name, shot_put, competition)
+  
+
+```
+
+
+What was the average points for competitors who ran the 400m in less than 50 seconds vs. those than ran 400m in more than 50 seconds?
+
+```{r}
+x400m_data <- clean_decathlon_data %>% 
+  select(name, x400m, points) %>% 
+  mutate(points = as.double(points))
+  
+x400m_data %>% 
+  filter(x400m < 50) %>% 
+  summarise(mean_below_50 = mean(points))
+
+  
+x400m_data %>% 
+  filter(x400m >= 50) %>% 
+  summarise(mean_above_50 = mean(points))
+```
+on average, those who were faster than 50s on the 400m scored less points than those who were slower than 50s
+

@@ -1,0 +1,165 @@
+---
+title: "Exploring the Data"
+author: "TK"
+date: '2022-03-28'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#HALLOWEEN CANDY DATA# 
+```{r}
+library(here)
+library(tidyverse)
+```
+##Read in the data - this is an xlsx format so we need the "readxl" library
+
+
+
+```{r}
+candy_combined <- read_csv(here("clean_data/candy_combined_sorted.csv"))
+```
+
+
+Total number of given reviews - not including na.
+
+```{r}
+candy_combined %>% 
+  select(x100_grand_bar:length(candy_combined)) %>%
+  summarise_all(funs(sum(!is.na(.)))) %>% 
+  rowSums()
+
+```
+
+there are 694480 reviews in total over 44 pieces of candy. 
+What was the average age of people who are going out trick or treating?
+
+
+```{r}
+candy_combined <- candy_combined %>% 
+  mutate(
+      str_replace_all(age, "[a-zA-Z]", NA_character_),
+      age = as.numeric(age),
+      age = case_when(
+        is.na(age) ~ NA_real_,
+        age > 100 ~ NA_real_,
+        TRUE ~ age
+      ),
+      age = coalesce(age, mean(age, na.rm = TRUE))
+      
+    )
+
+```
+The age was stored as a character, and had lots of smart answers with words in them. I have removed these and replaced them with the average age.
+```{r}
+candy_combined %>% 
+  filter(attending_t_or_t == "Yes") %>% 
+  select(age) %>% 
+  summarise(mean(age))
+
+
+```
+This is pretty jokes, that the average age of those attending T or T is ~35. I expected this to be much lower - 15 or 16.
+What was the average age of people who are __not__ going trick or treating?
+```{r}
+
+candy_combined %>% 
+  filter(attending_t_or_t != "Yes") %>% 
+  select(age) %>% 
+  summarise(mean(age))
+```
+
+
+The people who did not go on T or T had an average age of ~38... it seems that somewhere between the age of 34 and 38, people tend to stop trick or treating. Now I think about it, some of this data might be parents taking their children, and if if the data is american, the culture for trick or treating is much  more inclusive than in the uk.
+For each of joy, despair and meh, which candy bar revived the most of these ratings?
+
+```{r}
+
+
+candy_combined %>% 
+  select(x100_grand_bar:peanut_butter_bars) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars, names_to = "candy_name", values_to = "review") %>% 
+  group_by(review) %>% 
+  count(candy_name, review) %>% 
+  filter(n == max(n))
+
+
+```
+gum from baseball bars the most despair, full sized candy bars. the most joy, and lollipops were the most meh. Chick o sticks were the ones people most had a problem answering  for.
+
+How many people rated Starburst as despair?
+
+```{r}
+candy_combined %>% 
+  select(starburst) %>% 
+  pivot_longer(cols = starburst, names_to = "candy_name", values_to = "review") %>% 
+  group_by(review) %>% 
+  count(candy_name, review)
+
+```
+Starburst had 1900 recorded reviews which were DESPAIR.
+
+For the next three questions, count despair as -1, joy as +1, and meh as 0.
+
+What was the most popular candy bar by this rating system for each gender in the dataset ?
+
+
+```{r}
+
+candy_scores <- candy_combined %>% 
+  mutate(across(x100_grand_bar:peanut_butter_bars,
+    ~ case_when(
+      . == "JOY" ~ 1,
+      . =="MEH" ~ 0,
+      . =="DESPAIR" ~ -1,
+      TRUE ~ NA_real_
+    ))
+  ) 
+```
+
+
+```{r}
+candy_scores %>% 
+  select(gender, x100_grand_bar:peanut_butter_bars, -any_full_sized_candy_bar) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars , names_to = "candy_name", values_to = "review") %>% 
+  group_by(gender, candy_name) %>% 
+  drop_na(review) %>% 
+  summarise(total_score = sum(review)) %>% 
+  filter(total_score == max(total_score))
+  
+  
+  
+ 
+
+ 
+```
+I have omitted full_sized candy bar because it it a bit of an umbrella category, and dominates the results. Men clearly like Kit Kat and women/rather_not_say sid Lind Truffle. Our NA folk said Reeses PB Cups!
+
+What was the most popular candy bar by year
+```{r}
+candy_scores %>% 
+  select(year, x100_grand_bar:peanut_butter_bars, -any_full_sized_candy_bar) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars , names_to = "candy_name", values_to = "review") %>% 
+  group_by(year, candy_name) %>% 
+  drop_na(review) %>% 
+  summarise(total_score = sum(review)) %>% 
+  filter(total_score == max(total_score))
+  
+```
+
+What was the most popular candy bar by this rating for people in US, Canada, UK, and all other countries?
+
+```{r}
+
+candy_scores %>% 
+  select(country, x100_grand_bar:peanut_butter_bars, -any_full_sized_candy_bar) %>% 
+  pivot_longer(cols = x100_grand_bar:peanut_butter_bars , names_to = "candy_name", values_to = "review") %>% 
+  group_by(country, candy_name) %>% 
+  drop_na(review) %>% 
+  summarise(total_score = sum(review)) %>% 
+  filter(total_score == max(total_score))
+
+```
+

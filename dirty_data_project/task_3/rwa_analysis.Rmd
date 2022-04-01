@@ -1,0 +1,204 @@
+---
+title: "RIGHT WING AUTHORITARIANISM - THE STATS"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: FALSE
+    df_print: paged
+    theme : cosmo
+  pdf_document: default
+---
+
+___
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+
+```
+```{r, include=FALSE}
+rwa_clean <- read_csv(here("clean_data/rwa_clean.csv"))
+```
+# WHICH WING?
+
+#### _Right wing authoritarianism_ is a personality type which describes a person who is inclined to be submissive towards those in roles of established roles of authority. A _left wing authoritarian_, however, seems to behave in this same way towards those in unorthodox or counter-roles of authority. The observations in this survey were recorded to draw conclusions about who most relates to these behaviours based on multiple factors in their upbringings and education.
+
+___
+
+<details><summary><i>The data has already been cleaned and imported using this script..</i></summary>
+```{r, eval=FALSE}
+
+library(here)
+library(dplyr)
+
+rwa_data <- read_csv(here("dirty_data/rwa.csv")) %>% 
+  janitor::clean_names()
+
+#some answers were recorded with a reversed value system - this can be reversed with 10-.x as the value.
+
+
+edit <- c("q4", "q6", "q8", "q9", "q11", "q13", "q15", "q18", "q20", "q21")
+
+rwa_data <- rwa_data %>% 
+  mutate(across(edit, ~ 10-.x)
+  ) 
+
+#others were a simple yes or no answer - this can be recorded as a logical input.
+
+rwa_data <- rwa_data %>% 
+  mutate(across(vcl1:vcl16, ~ as.logical(.x))) 
+
+#some of these will be requiring more detailed information for analysis.
+
+rwa_data <- rwa_data %>% 
+  mutate(
+    gender = case_when(
+      gender == 1 ~ "m",
+      gender == 2 ~ "f",
+      gender == 3 ~ "other",
+      TRUE ~ NA_character_
+    ),
+    hand = case_when(
+      hand == 1 ~ "r",
+      hand == 2 ~ "l",
+      hand == 3 ~ "ambi",
+      TRUE ~ NA_character_
+    ),
+    
+    urban = case_when(
+      urban == 1 ~ "rural",
+      urban == 2 ~ "suburban",
+      urban == 3 ~ "urban",
+      TRUE ~ NA_character_
+    ),
+    education = case_when(
+      education == 1 ~ "less than highschool",
+      education== 2 ~ "high school",
+      education == 3 ~ "university degree",
+      education == 4 ~ "graduate degree",
+      TRUE ~ NA_character_
+    )
+  )
+
+#a totals column will also be required for analysis
+
+rwa_data <- rwa_data %>% 
+  mutate(
+    total_score = rowSums(.[3:22]), .before = q1
+  )
+
+rwa_data %>% 
+write_csv(here("clean_data/rwa_clean.csv"))
+
+  
+```
+</details>
+___
+
+# GENDER AND RIGHT-WING-AUTHORITARIAN SCORE
+
+#### It's a well known fact that because of environmental factors, the gender you identify with has a large impact on your behavioural traits. Do our observations suggest that this is something which effects our RWA score? 
+
+
+```{r}
+rwa_clean %>% 
+  select(total_score, gender) %>%
+  drop_na(gender) %>% 
+  group_by(gender) %>% 
+  summarise(average_score_by_gender = mean(total_score))
+```
+#### So, it looks like men are over-all the most right-wing-authoritarian oriented, whereas our trans and NB folk are the least.
+
+___
+
+# LEFT HAND OR RIGHT HAND?
+
+#### Does dexterity define authoritarian characteristics? Some say left handed people are more creative - perhaps there's a political intuition associated with it too.
+
+```{r}
+rwa_clean %>% 
+  select(total_score, hand) %>%
+  drop_na(hand) %>% 
+  group_by(hand) %>% 
+  summarise(average_score_by_dexterity = mean(total_score))
+```
+#### The results show that there's barely a difference between the average score in left-handed and right-handed people. Ambidextrous people, however, tend to have a higher score by close to 12.5%.
+
+___
+
+# WHERE YOU GREW UP/FAMILY SIZE
+
+#### Some attributes could be related to the type of neighbourhood you grew up in. Does this have a connection to the size of your family?
+
+```{r}
+rwa_clean %>% 
+  select(urban, familysize) %>%
+  drop_na(familysize) %>% 
+  group_by(urban) %>% 
+  summarise(average_size_by_urban_environment = mean(familysize),
+            number_of_siblings = average_size_by_urban_environment - 1)
+```
+
+#### Looks like kids in rural families tended to have the most siblings. This decreases as upbringings become more urban.
+
+___
+
+# EDUCATION LEVEL AND TESTING TIME
+
+#### How long did it take our participants to take the test? Did their education level make any difference in this?
+```{r}
+
+edu_plot <- rwa_clean %>% 
+  select(education, testelapse) %>%
+  drop_na(testelapse, education) %>% 
+  group_by(education) %>% 
+  summarise(avg_time = mean(testelapse))
+
+library(ggplot2)
+
+ggplot(data=edu_plot, aes(x = education, y = avg_time)) +
+  geom_bar(stat="identity")
+
+
+```
+
+
+##### The results show that the level of education has very little correlation with test answering speed... but the results differ so wildly, and the number of participants in each category suggest that the averages are accurate. I'd be interested to learn more about this.
+
+____
+
+# AGE AND RWA SCORE
+
+#### Do people who are older have a higher RWA score... or a lower one?
+
+```{r}
+rwa_age_groups <- rwa_clean %>% 
+  select(age, total_score) %>% 
+  mutate(
+    age_group = case_when(
+      age < 18 ~ "under 18",
+      age >= 18 & age <= 25 ~ "18 to 25",
+      age >= 26 & age <= 40 ~ "26 to 40",
+      age >= 41 & age <= 60 ~ "41 to 60",
+      age > 60 ~ "over 60"
+    )
+  ) 
+ age_plot <- rwa_age_groups %>% 
+  drop_na(total_score, age) %>% 
+  group_by(age_group) %>% 
+  summarise(avg_score = mean(total_score))
+
+library(ggplot2)
+
+ggplot(data=age_plot, aes(x = reorder(age_group, -avg_score), y = avg_score)) +
+  geom_bar(stat="identity") 
+  
+
+```
+
+
+#### OOOO! Younger people tend to have a higher score!
+
+

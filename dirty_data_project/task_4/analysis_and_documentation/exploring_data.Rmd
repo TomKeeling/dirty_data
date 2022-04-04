@@ -6,7 +6,7 @@ output:
     toc_float: true
     number_sections: true
     df_print: paged
-    theme : cosmo
+    theme : journal
   pdf_document: default
 ---
 
@@ -20,6 +20,8 @@ library(tidyverse)
 ```
 
 # IMPORT & CLEAN DATA
+## IMPORT DATA SUBHEADINg
+
 This data is pretty messy, so I'm reading it in having already used my own script to clean it. You can find this in the _"data_cleaning_scripts"_ folder. The document is a survey of worldwide participants asked if a particular candy gives them the feeling of "joy", "despair" or "meh"... It also includes variables such as the country and age of participants.
 
 <details>

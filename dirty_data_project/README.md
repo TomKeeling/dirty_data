@@ -1,10 +1,11 @@
 # dirty_data_codeclan_project_tomkeeling
  
- This project contains two cleaning and analysis tasks. 
+ This project contains three cleaning and analysis tasks. 
  1. Decathlon Data
  2. Halloween Candy Data
+ 3. Right Wing Authority Index
  
-Both tasks are written and completed with .Rmd and .R files, using packages
+All tasks are written and completed with knitted .Rmd and .R script files, using packages
 
  - tidyverse
  - here

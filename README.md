@@ -6,9 +6,10 @@
 *  Halloween Candy Data (task_4 - intensive cleaning of survey data.)
 *  Right Wing Authority Index (task_6 - creating an index from survey data.)
  
-Both tasks are written and completed with .Rmd and .R files, using packages
+All tasks are written and completed with .Rmd and .R files, using packages
 
  - tidyverse
  - here
  - janitor
  - datasets
+ - ggplot2
